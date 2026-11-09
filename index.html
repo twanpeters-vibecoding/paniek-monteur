@@ -464,25 +464,25 @@
             ctx.stroke();
         }
 
-        // Subtiele, naadloze baanformule op basis van 4 gelijke kwadranten
+        // Volledig zuivere en subtiele curve-formule zonder snijdende lijnen
         function getTrackCoordinates(t) {
             let x, y;
-            if (t < 0.25) { // 1. De Klim (Linker onderkant naar piek)
+            if (t < 0.25) { // 1. De Klim (Start links-onder naar hoge piek)
                 let p = t / 0.25;
-                x = 100 + p * 150;
+                x = 90 + p * 150;
                 y = 280 - p * 200;
-            } else if (t < 0.50) { // 2. De Drop (Vloeiend omlaag richting het begin van de looping)
+            } else if (t < 0.50) { // 2. De Drop (Subtiele vloeiende boog omlaag naar de looping-invoer)
                 let p = (t - 0.25) / 0.25;
-                x = 250 + p * 150;
-                y = 80 + p * 170;
-            } else if (t < 0.75) { // 3. De Looping (Prachtige, op zichzelf staande cirkel zonder snijdende lijnen)
+                x = 240 + p * 140;
+                y = 80 + p * 180;
+            } else if (t < 0.75) { // 3. De Looping (Op zichzelf staande, strakke cirkel gecentreerd op 470, 210)
                 let p = (t - 0.50) / 0.25;
                 let angle = p * (Math.PI * 2) - Math.PI / 2;
-                x = 500 + Math.cos(angle) * 55;
-                y = 205 + Math.sin(angle) * 55;
-            } else { // 4. De Remzone (Vloeiend uit de looping naar rechts en terug naar start)
+                x = 470 + Math.cos(angle) * 55;
+                y = 210 + Math.sin(angle) * 55;
+            } else { // 4. De Remzone (Vloeiende uitgang van looping naar rechts en terug naar start)
                 let p = (t - 0.75) / 0.25;
-                x = 555 + p * 145;
+                x = 525 + p * 185;
                 y = 280;
             }
             return {x, y};
