@@ -87,19 +87,26 @@
             border-radius: 8px;
             padding: 10px;
             text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
             position: relative;
+            opacity: 0.6;
         }
 
-        .sector-card:hover {
+        .sector-card.active-sector {
+            opacity: 1.0;
             border-color: #00ffcc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sector-card.active-sector:hover {
             transform: translateY(-2px);
         }
 
         .sector-card.danger {
             border-color: #ff0055;
             animation: pulse-danger 0.8s infinite alternate;
+            cursor: pointer;
+            opacity: 1.0;
         }
 
         @keyframes pulse-danger {
@@ -116,11 +123,16 @@
 
         .sector-status {
             font-size: 0.8rem;
+            color: #888;
+        }
+
+        .sector-card.active-sector .sector-status {
             color: #00ffcc;
         }
 
         .sector-card.danger .sector-status {
             color: #ff4d4d;
+            font-weight: bold;
         }
 
         /* Minigame Overlay */
@@ -130,7 +142,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(10, 3, 20, 0.92);
+            background: rgba(10, 3, 20, 0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -152,7 +164,11 @@
             padding: 20px;
             border-radius: 10px;
             border: 1px solid #4a1c7a;
-            min-width: 300px;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
         }
 
         .btn {
@@ -164,7 +180,6 @@
             font-weight: bold;
             border-radius: 5px;
             cursor: pointer;
-            margin: 5px;
             transition: 0.2s;
         }
 
@@ -181,7 +196,6 @@
             background: #cc0044;
         }
 
-        /* Start / Game Over Screens */
         .screen-overlay {
             position: absolute;
             top: 0;
@@ -221,13 +235,18 @@
             20%, 60% { transform: translateX(-8px); }
             40%, 80% { transform: translateX(8px); }
         }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #00ffcc;
+        }
     </style>
 </head>
 <body>
 
     <header>
         <h1>De Paniek-Monteur</h1>
-        <p>Houd het achtbaanwagentje heel en red het park!</p>
+        <p>Los storingen op exact op de juiste plek op de baan!</p>
     </header>
 
     <div class="stats-container">
@@ -237,43 +256,39 @@
     </div>
 
     <div class="game-container" id="game-box">
-        <!-- Canvas Circuit -->
         <canvas id="coasterCanvas" width="800" height="350"></canvas>
 
-        <!-- 4 Sectoren onderaan -->
         <div class="sectors-panel">
-            <div class="sector-card" id="sector-0" onclick="openMiniGame(0)">
+            <div class="sector-card" id="sector-0" onclick="tryOpenMiniGame(0)">
                 <div class="sector-title">1. De Klim</div>
-                <div class="sector-status" id="status-0">Optimaal</div>
+                <div class="sector-status" id="status-0">Wachten...</div>
             </div>
-            <div class="sector-card" id="sector-1" onclick="openMiniGame(1)">
+            <div class="sector-card" id="sector-1" onclick="tryOpenMiniGame(1)">
                 <div class="sector-title">2. De Drop</div>
-                <div class="sector-status" id="status-1">Optimaal</div>
+                <div class="sector-status" id="status-1">Wachten...</div>
             </div>
-            <div class="sector-card" id="sector-2" onclick="openMiniGame(2)">
+            <div class="sector-card" id="sector-2" onclick="tryOpenMiniGame(2)">
                 <div class="sector-title">3. De Looping</div>
-                <div class="sector-status" id="status-2">Optimaal</div>
+                <div class="sector-status" id="status-2">Wachten...</div>
             </div>
-            <div class="sector-card" id="sector-3" onclick="openMiniGame(3)">
+            <div class="sector-card" id="sector-3" onclick="tryOpenMiniGame(3)">
                 <div class="sector-title">4. De Remzone</div>
-                <div class="sector-status" id="status-3">Optimaal</div>
+                <div class="sector-status" id="status-3">Wachten...</div>
             </div>
         </div>
 
-        <!-- Minigame Popup Overlay -->
+        <!-- Minigame Overlay -->
         <div class="minigame-overlay" id="minigame-overlay">
             <h2 id="mg-title">Storing!</h2>
             <p id="mg-instruction">Los het snel op!</p>
-            <div class="minigame-content" id="mg-content">
-                <!-- Dynamische minigame inhoud -->
-            </div>
-            <button class="btn btn-danger" onclick="closeMiniGame(false)">Sluiten / Negeren</button>
+            <div class="minigame-content" id="mg-content"></div>
+            <button class="btn btn-danger" onclick="closeMiniGame(false)" style="margin-top: 10px;">Negeren (-15% Stab)</button>
         </div>
 
         <!-- Start Scherm -->
         <div class="screen-overlay" id="start-screen">
             <h2>Klaar voor de chaos?</h2>
-            <p>Er rijdt één achtbaanwagentje over je baan. Als er een sector rood knippert, klik er dan direct op om een mini-game te starten en een crash te voorkomen!</p>
+            <p>Het wagentje stopt automatisch op de baan wanneer er een storing is in de actieve sector. Klik op de sector om het probleem op te lossen!</p>
             <button class="btn" onclick="startGame()">Start Dienst</button>
         </div>
 
@@ -295,21 +310,24 @@
         let timeLeft = 60;
         let gameTimer, cartInterval, hazardInterval;
 
-        // Wagentje positie op de baan (0.0 tot 1.0)
         let cartProgress = 0.0;
-        const cartSpeed = 0.0018;
+        const baseSpeed = 0.0015;
+        let isPausedForHazard = false;
 
-        // Sectoren status: 0 = OK, 1 = Storing actief
+        // Sectoren met nauwkeurige baan-intervallen (tussen 0.0 en 1.0)
+        // 0: Klim (0.00 tot 0.25)
+        // 1: Drop (0.25 tot 0.50)
+        // 2: Looping (0.50 tot 0.75)
+        // 3: Remzone (0.75 tot 1.00)
         let sectors = [
-            { name: "De Klim", status: 0, timer: 0 },
-            { name: "De Drop", status: 0, timer: 0 },
-            { name: "De Looping", status: 0, timer: 0 },
-            { name: "De Remzone", status: 0, timer: 0 }
+            { name: "De Klim", minT: 0.02, maxT: 0.23, status: 0 },
+            { name: "De Drop", minT: 0.27, maxT: 0.48, status: 0 },
+            { name: "De Looping", minT: 0.52, maxT: 0.73, status: 0 },
+            { name: "De Remzone", minT: 0.77, maxT: 0.98, status: 0 }
         ];
 
-        let activeMiniGameSector = null;
+        let activeHazardSector = null;
 
-        // Web Audio API
         let audioCtx = null;
         function playSound(type) {
             try {
@@ -318,8 +336,8 @@
                 let gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 let now = audioCtx.currentTime;
+
                 if (type === 'click') {
                     osc.frequency.setValueAtTime(400, now);
                     osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
@@ -328,8 +346,8 @@
                     osc.start(now);
                     osc.stop(now + 0.1);
                 } else if (type === 'success') {
-                    osc.frequency.setValueAtTime(523.25, now); // C5
-                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.1);
                     gain.gain.setValueAtTime(0.15, now);
                     gain.gain.linearRampToValueAtTime(0, now + 0.3);
                     osc.start(now);
@@ -353,7 +371,9 @@
             score = 0;
             timeLeft = 60;
             cartProgress = 0.0;
-            sectors.forEach(s => { s.status = 0; s.timer = 0; });
+            isPausedForHazard = false;
+            sectors.forEach(s => s.status = 0);
+            activeHazardSector = null;
             gameActive = true;
 
             updateUI();
@@ -372,7 +392,7 @@
             }, 1000);
 
             cartInterval = setInterval(updateGameLoop, 30);
-            hazardInterval = setInterval(triggerRandomHazard, 4500);
+            hazardInterval = setInterval(triggerRandomHazard, 5000);
         }
 
         function updateUI() {
@@ -383,103 +403,125 @@
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`sector-${i}`);
                 const statusTxt = document.getElementById(`status-${i}`);
-                if (sectors[i].status === 1) {
+                
+                card.className = "sector-card";
+                
+                let s = sectors[i];
+                let inRange = cartProgress >= s.minT && cartProgress <= s.maxT;
+
+                if (s.status === 1) {
                     card.classList.add('danger');
                     statusTxt.innerText = "STORING!";
+                } else if (inRange) {
+                    card.classList.add('active-sector');
+                    statusTxt.innerText = "Trein hier";
                 } else {
-                    card.classList.remove('danger');
-                    statusTxt.innerText = "Optimaal";
+                    statusTxt.innerText = "Normaal";
                 }
             }
         }
 
-        // --- Cirkel / Baan Tekenen op Canvas ---
         function updateGameLoop() {
             if (!gameActive) return;
 
-            // Beweeg karretje
-            cartProgress += cartSpeed;
-            if (cartProgress > 1.0) cartProgress = 0.0;
+            // Als er een storing is en het wagentje bevindt zich in die sector, pauzeer beweging!
+            if (!isPausedForHazard) {
+                cartProgress += baseSpeed;
+                if (cartProgress > 1.0) cartProgress = 0.0;
 
-            // Wis canvas
+                // Controleer of wagentje in een sector komt met een actieve storing
+                for (let i = 0; i < 4; i++) {
+                    if (sectors[i].status === 1 && cartProgress >= sectors[i].minT && cartProgress <= sectors[i].maxT) {
+                        isPausedForHazard = true; // Wagentje staat stil op de baan!
+                        playSound('alarm');
+                        document.getElementById('game-box').classList.add('shake');
+                        setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
+                    }
+                }
+            }
+
+            drawTrackAndCart();
+            updateUI();
+        }
+
+        function drawTrackAndCart() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Teken achtbaanrails (mooie vloeiende lijn)
+            // Teken achtbaanbaan met duidelijke Klim, Drop, Looping en Remzone
             ctx.beginPath();
             ctx.strokeStyle = "#4a1c7a";
             ctx.lineWidth = 6;
             ctx.shadowBlur = 10;
             ctx.shadowColor = "#7b2cbf";
-            
-            // Teken een baan met een klim, drop, looping en remmen
+
+            // 1. Klim (Links omhoog) -> 2. Drop (Naar beneden) -> 3. Looping (Midden lus) -> 4. Remzone (Rechts vlak)
             ctx.moveTo(50, 280);
-            ctx.bezierCurveTo(200, 50, 300, 50, 400, 180);
-            ctx.bezierCurveTo(500, 300, 600, 50, 750, 280);
+            ctx.bezierCurveTo(120, 280, 150, 60, 220, 60); // Klim
+            ctx.bezierCurveTo(280, 60, 260, 270, 350, 270); // Drop
+            ctx.arc(425, 200, 70, Math.PI * 0.75, Math.PI * 2.25, false); // Looping
+            ctx.moveTo(495, 270);
+            ctx.bezierCurveTo(600, 270, 680, 280, 750, 280); // Remzone
             ctx.stroke();
-            ctx.shadowBlur = 0; // reset
+            ctx.shadowBlur = 0;
 
-            // Bereken positie karretje op basis van cartProgress
-            let pos = getBezierPosition(cartProgress);
+            let pos = getTrackCoordinates(cartProgress);
 
-            // Teken karretje
-            ctx.fillStyle = "#ff0055";
+            // Teken achtbaanwagentje
+            ctx.fillStyle = isPausedForHazard ? "#ff0055" : "#00ffcc";
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#fff";
             ctx.lineWidth = 2;
             ctx.stroke();
-
-            // Passagier hoofdje
-            ctx.fillStyle = "#00ffcc";
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y - 4, 4, 0, Math.PI * 2);
-            ctx.fill();
         }
 
-        function getBezierPosition(t) {
-            // Eenvoudige benadering van de curve voor visualisatie
-            let p0 = {x: 50, y: 280};
-            let p1 = {x: 200, y: 50};
-            let p2 = {x: 300, y: 50};
-            let p3 = {x: 400, y: 180};
-            let p4 = {x: 500, y: 300};
-            let p5 = {x: 600, y: 50};
-            let p6 = {x: 750, y: 280};
-
+        function getTrackCoordinates(t) {
+            // Wiskundige coördinaten passend bij de getekende baansegmenten
             let x, y;
-            if (t < 0.5) {
-                let lt = t * 2;
-                let u = 1 - lt;
-                x = u*u*u*p0.x + 3*u*u*lt*p1.x + 3*u*lt*lt*p2.x + lt*lt*lt*p3.x;
-                y = u*u*u*p0.y + 3*u*u*lt*p1.y + 3*u*lt*lt*p2.y + lt*lt*lt*p3.y;
-            } else {
-                let lt = (t - 0.5) * 2;
-                let u = 1 - lt;
-                x = u*u*u*p3.x + 3*u*u*lt*p4.x + 3*u*lt*lt*p5.x + lt*lt*lt*p6.x;
-                y = u*u*u*p3.y + 3*u*u*lt*p4.y + 3*u*lt*lt*p5.y + lt*lt*lt*p6.y;
+            if (t < 0.25) { // Klim
+                let p = t / 0.25;
+                x = 50 + p * 170;
+                y = 280 - p * 220;
+            } else if (t < 0.5) { // Drop
+                let p = (t - 0.25) / 0.25;
+                x = 220 + p * 130;
+                y = 60 + p * 210;
+            } else if (t < 0.75) { // Looping
+                let p = (t - 0.5) / 0.25;
+                let angle = (Math.PI * 0.75) + p * (Math.PI * 1.5);
+                x = 425 + Math.cos(angle) * 70;
+                y = 200 + Math.sin(angle) * 70;
+            } else { // Remzone
+                let p = (t - 0.75) / 0.25;
+                x = 495 + p * 255;
+                y = 270 + p * 10;
             }
             return {x, y};
         }
 
         function triggerRandomHazard() {
-            if (!gameActive) return;
-            // Kies een willekeurige sector die nog geen storing heeft
+            if (!gameActive || isPausedForHazard) return;
+            
             let available = sectors.map((s, idx) => s.status === 0 ? idx : -1).filter(idx => idx !== -1);
             if (available.length > 0) {
                 let chosen = available[Math.floor(Math.random() * available.length)];
                 sectors[chosen].status = 1;
-                playSound('alarm');
-                document.getElementById('game-box').classList.add('shake');
-                setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
                 updateUI();
             }
         }
 
-        // --- Uitgebreide Mini-games per Sector ---
-        function openMiniGame(sectorIdx) {
+        function tryOpenMiniGame(sectorIdx) {
             if (!gameActive || sectors[sectorIdx].status === 0) return;
-            activeMiniGameSector = sectorIdx;
+            
+            // Controleer of de trein ook daadwerkelijk in deze sector is gestopt!
+            let s = sectors[sectorIdx];
+            if (!(cartProgress >= s.minT && cartProgress <= s.maxT)) {
+                alert("De trein is nog niet in deze sector! Wacht tot hij arriveert.");
+                return;
+            }
+
+            activeHazardSector = sectorIdx;
             playSound('click');
 
             const overlay = document.getElementById('minigame-overlay');
@@ -488,101 +530,128 @@
             const content = document.getElementById('mg-content');
 
             overlay.style.display = 'flex';
-            title.innerText = `Storing in: ${sectors[sectorIdx].name}`;
-
+            title.innerText = `Storing in: ${sectors.name}`;
             content.innerHTML = '';
 
+            // Gevarieerde mini-games per sector (zodat het niet steeds hetzelfde is)
             if (sectorIdx === 0) {
-                // Minigame 1: Bouten aandraaien (3x klikken)
-                instruction.innerText = "Draai de losse bouten snel aan!";
-                let clicksNeeded = 3;
+                // Klim: Sleep/Klik hijskabel connectie (Willekeurige knopreeks)
+                instruction.innerText = "Klik in de juiste volgorde op de hijskabels (1, 2, 3)!";
+                let sequence = [1, 2, 3].sort(() => Math.random() - 0.5);
+                let currentStep = 0;
+                
+                sequence.forEach(num => {
+                    let btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.innerText = `Kabel #${num}`;
+                    btn.onclick = () => {
+                        if (num === sequence[currentStep]) {
+                            currentStep++;
+                            btn.style.opacity = '0.4';
+                            playSound('click');
+                            if (currentStep === sequence.length) resolveMiniGame();
+                        } else {
+                            stability -= 5;
+                            playSound('alarm');
+                            updateUI();
+                            alert("Verkeerde volgorde!");
+                        }
+                    };
+                    content.appendChild(btn);
+                });
+
+            } else if (sectorIdx === 1) {
+                // Drop: Snelheidsschuif exact afstellen
+                instruction.innerText = "Zet de remdemper precies op 50%!";
+                let slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = '0';
+                slider.max = '100';
+                slider.value = Math.floor(Math.random() * 80) + 10;
+                
+                let valLbl = document.createElement('p');
+                valLbl.innerText = `Huidige waarde: ${slider.value}%`;
+                valLbl.style.color = '#00ffcc';
+                
+                slider.oninput = () => { valLbl.innerText = `Huidige waarde: ${slider.value}%`; };
+
+                let checkBtn = document.createElement('button');
+                checkBtn.className = 'btn';
+                checkBtn.innerText = 'Bevestig Stand';
+                checkBtn.onclick = () => {
+                    let val = parseInt(slider.value);
+                    if (val >= 45 && val <= 55) {
+                        resolveMiniGame();
+                    } else {
+                        stability -= 5;
+                        playSound('alarm');
+                        updateUI();
+                        alert("Niet nauwkeurig genoeg! Richt op 50%.");
+                    }
+                };
+                content.appendChild(slider);
+                content.appendChild(valLbl);
+                content.appendChild(checkBtn);
+
+            } else if (sectorIdx === 2) {
+                // Looping: G-Kracht ontluchten (Snel 4 verschillende kleppen indrukken)
+                instruction.innerText = "Druk de 3 ontluchtingsventielen in!";
+                let options = ['Hydro-Ventiel', 'Stoom-Release', 'Lucht-Klep'].sort(() => Math.random() - 0.5);
+                let clickedCount = 0;
+
+                options.forEach(name => {
+                    let btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.innerText = name;
+                    let used = false;
+                    btn.onclick = () => {
+                        if (!used) {
+                            used = true;
+                            clickedCount++;
+                            btn.style.background = '#555';
+                            playSound('click');
+                            if (clickedCount === 3) resolveMiniGame();
+                        }
+                    };
+                    content.appendChild(btn);
+                });
+
+            } else if (sectorIdx === 3) {
+                // Remzone: Remblokken losmaken door dubbel/snel te klikken in juiste vlak
+                instruction.innerText = "Klik 5 keer snel op de noodrem-knop!";
+                let clicksLeft = 5;
                 let btn = document.createElement('button');
                 btn.className = 'btn';
-                btn.innerText = `Vastdraaien (${clicksNeeded} te gaan)`;
+                btn.innerText = `Noodrem (${clicksLeft}x)`;
                 btn.onclick = () => {
-                    clicksNeeded--;
+                    clicksLeft--;
                     playSound('click');
-                    if (clicksNeeded > 0) {
-                        btn.innerText = `Vastdraaien (${clicksNeeded} te gaan)`;
+                    if (clicksLeft > 0) {
+                        btn.innerText = `Noodrem (${clicksLeft}x)`;
                     } else {
                         resolveMiniGame();
                     }
                 };
                 content.appendChild(btn);
-
-            } else if (sectorIdx === 1) {
-                // Minigame 2: Koelwater spuiten (Snel knoppen kiezen)
-                instruction.innerText = "Klik op de juiste klep om wielen te koelen!";
-                let targetValve = Math.floor(Math.random() * 3) + 1;
-                for (let i = 1; i <= 3; i++) {
-                    let vBtn = document.createElement('button');
-                    vBtn.className = 'btn';
-                    vBtn.innerText = `Klep #${i}`;
-                    vBtn.onclick = () => {
-                        if (i === targetValve) {
-                            resolveMiniGame();
-                        } else {
-                            stability -= 5;
-                            updateUI();
-                            playSound('alarm');
-                            alert("Foute klep! Stabiliteit daalt.");
-                        }
-                    };
-                    content.appendChild(vBtn);
-                }
-
-            } else if (sectorIdx === 2) {
-                // Minigame 3: Stroomkabel verbinden (Spam click)
-                instruction.innerText = "Duw de hoofdschakelaar omhoog!";
-                let progress = 0;
-                let sBtn = document.createElement('button');
-                sBtn.className = 'btn';
-                sBtn.innerText = `Duwen! (0%)`;
-                sBtn.onclick = () => {
-                    progress += 25;
-                    playSound('click');
-                    if (progress >= 100) {
-                        resolveMiniGame();
-                    } else {
-                        sBtn.innerText = `Duwen! (${progress}%)`;
-                    }
-                };
-                content.appendChild(sBtn);
-
-            } else if (sectorIdx === 3) {
-                // Minigame 4: Remhendel justeren
-                instruction.innerText = "Zet de remhendel op 'Niveau 2'!";
-                for (let lvl = 1; lvl <= 3; lvl++) {
-                    let rBtn = document.createElement('button');
-                    rBtn.className = 'btn';
-                    rBtn.innerText = `Remniveau ${lvl}`;
-                    rBtn.onclick = () => {
-                        if (lvl === 2) {
-                            resolveMiniGame();
-                        } else {
-                            stability -= 5;
-                            updateUI();
-                            playSound('alarm');
-                            alert("Verkeerd niveau!");
-                        }
-                    };
-                    content.appendChild(rBtn);
-                }
             }
         }
 
         function resolveMiniGame() {
             playSound('success');
-            sectors[activeMiniGameSector].status = 0;
-            score += 100;
+            sectors[activeHazardSector].status = 0;
+            activeHazardSector = null;
+            isPausedForHazard = false; // Wagentje rijdt weer verder!
+            score += 150;
             document.getElementById('minigame-overlay').style.display = 'none';
             updateUI();
         }
 
         function closeMiniGame(success) {
             document.getElementById('minigame-overlay').style.display = 'none';
-            if (!success && activeMiniGameSector !== null) {
-                sectors[activeMiniGameSector].status = 0;
+            if (!success && activeHazardSector !== null) {
+                sectors[activeHazardSector].status = 0;
+                activeHazardSector = null;
+                isPausedForHazard = false; // Wagentje rijdt door ondanks straf
                 stability -= 15;
                 if (stability <= 0) {
                     stability = 0;
