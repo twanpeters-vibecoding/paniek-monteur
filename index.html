@@ -94,12 +94,6 @@
         .sector-card.active-sector {
             opacity: 1.0;
             border-color: #00ffcc;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .sector-card.active-sector:hover {
-            transform: translateY(-2px);
         }
 
         .sector-card.danger {
@@ -246,7 +240,7 @@
 
     <header>
         <h1>De Paniek-Monteur</h1>
-        <p>Los storingen op exact op de juiste plek op de baan!</p>
+        <p>Los storingen direct op wanneer het wagentje arriveert!</p>
     </header>
 
     <div class="stats-container">
@@ -261,19 +255,19 @@
         <div class="sectors-panel">
             <div class="sector-card" id="sector-0" onclick="tryOpenMiniGame(0)">
                 <div class="sector-title">1. De Klim</div>
-                <div class="sector-status" id="status-0">Wachten...</div>
+                <div class="sector-status" id="status-0">Normaal</div>
             </div>
             <div class="sector-card" id="sector-1" onclick="tryOpenMiniGame(1)">
                 <div class="sector-title">2. De Drop</div>
-                <div class="sector-status" id="status-1">Wachten...</div>
+                <div class="sector-status" id="status-1">Normaal</div>
             </div>
             <div class="sector-card" id="sector-2" onclick="tryOpenMiniGame(2)">
                 <div class="sector-title">3. De Looping</div>
-                <div class="sector-status" id="status-2">Wachten...</div>
+                <div class="sector-status" id="status-2">Normaal</div>
             </div>
             <div class="sector-card" id="sector-3" onclick="tryOpenMiniGame(3)">
                 <div class="sector-title">4. De Remzone</div>
-                <div class="sector-status" id="status-3">Wachten...</div>
+                <div class="sector-status" id="status-3">Normaal</div>
             </div>
         </div>
 
@@ -288,7 +282,7 @@
         <!-- Start Scherm -->
         <div class="screen-overlay" id="start-screen">
             <h2>Klaar voor de chaos?</h2>
-            <p>Het wagentje stopt automatisch op de baan wanneer er een storing is in de actieve sector. Klik op de sector om het probleem op te lossen!</p>
+            <p>Het wagentje volgt de doorlopende baan. Bij een storing stopt het wagentje automatisch wanneer het in de sector arriveert. Klik op de sector om te repareren!</p>
             <button class="btn" onclick="startGame()">Start Dienst</button>
         </div>
 
@@ -314,16 +308,12 @@
         const baseSpeed = 0.0015;
         let isPausedForHazard = false;
 
-        // Sectoren met nauwkeurige baan-intervallen (tussen 0.0 en 1.0)
-        // 0: Klim (0.00 tot 0.25)
-        // 1: Drop (0.25 tot 0.50)
-        // 2: Looping (0.50 tot 0.75)
-        // 3: Remzone (0.75 tot 1.00)
+        // Sectoren met nauwkeurige baan-intervallen
         let sectors = [
-            { name: "De Klim", minT: 0.02, maxT: 0.23, status: 0 },
-            { name: "De Drop", minT: 0.27, maxT: 0.48, status: 0 },
-            { name: "De Looping", minT: 0.52, maxT: 0.73, status: 0 },
-            { name: "De Remzone", minT: 0.77, maxT: 0.98, status: 0 }
+            { name: "De Klim", minT: 0.0, maxT: 0.25, hasHazard: false },
+            { name: "De Drop", minT: 0.25, maxT: 0.5, hasHazard: false },
+            { name: "De Looping", minT: 0.5, maxT: 0.75, hasHazard: false },
+            { name: "De Remzone", minT: 0.75, maxT: 1.0, hasHazard: false }
         ];
 
         let activeHazardSector = null;
@@ -372,7 +362,7 @@
             timeLeft = 60;
             cartProgress = 0.0;
             isPausedForHazard = false;
-            sectors.forEach(s => s.status = 0);
+            sectors.forEach(s => s.hasHazard = false);
             activeHazardSector = null;
             gameActive = true;
 
@@ -385,14 +375,12 @@
             gameTimer = setInterval(() => {
                 if (!gameActive) return;
                 timeLeft--;
-                if (timeLeft <= 0) {
-                    endGame(true);
-                }
+                if (timeLeft <= 0) endGame(true);
                 updateUI();
             }, 1000);
 
             cartInterval = setInterval(updateGameLoop, 30);
-            hazardInterval = setInterval(triggerRandomHazard, 5000);
+            hazardInterval = setInterval(triggerRandomHazard, 6000);
         }
 
         function updateUI() {
@@ -403,13 +391,12 @@
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`sector-${i}`);
                 const statusTxt = document.getElementById(`status-${i}`);
-                
                 card.className = "sector-card";
-                
-                let s = sectors[i];
-                let inRange = cartProgress >= s.minT && cartProgress <= s.maxT;
 
-                if (s.status === 1) {
+                let s = sectors[i];
+                let inRange = cartProgress >= s.minT && cartProgress < s.maxT;
+
+                if (s.hasHazard) {
                     card.classList.add('danger');
                     statusTxt.innerText = "STORING!";
                 } else if (inRange) {
@@ -424,15 +411,16 @@
         function updateGameLoop() {
             if (!gameActive) return;
 
-            // Als er een storing is en het wagentje bevindt zich in die sector, pauzeer beweging!
             if (!isPausedForHazard) {
                 cartProgress += baseSpeed;
                 if (cartProgress > 1.0) cartProgress = 0.0;
 
-                // Controleer of wagentje in een sector komt met een actieve storing
+                // Controleer of de trein in een sector arriveert die een storing heeft klaarstaan
                 for (let i = 0; i < 4; i++) {
-                    if (sectors[i].status === 1 && cartProgress >= sectors[i].minT && cartProgress <= sectors[i].maxT) {
-                        isPausedForHazard = true; // Wagentje staat stil op de baan!
+                    let s = sectors[i];
+                    if (s.hasHazard && cartProgress >= s.minT && cartProgress < s.maxT && activeHazardSector === null) {
+                        isPausedForHazard = true;
+                        activeHazardSector = i;
                         playSound('alarm');
                         document.getElementById('game-box').classList.add('shake');
                         setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
@@ -447,26 +435,23 @@
         function drawTrackAndCart() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Teken achtbaanbaan met duidelijke Klim, Drop, Looping en Remzone
+            // 1 Doorlopende, naadloze achtbaanlijn berekenen en tekenen
             ctx.beginPath();
             ctx.strokeStyle = "#4a1c7a";
             ctx.lineWidth = 6;
             ctx.shadowBlur = 10;
             ctx.shadowColor = "#7b2cbf";
 
-            // 1. Klim (Links omhoog) -> 2. Drop (Naar beneden) -> 3. Looping (Midden lus) -> 4. Remzone (Rechts vlak)
-            ctx.moveTo(50, 280);
-            ctx.bezierCurveTo(120, 280, 150, 60, 220, 60); // Klim
-            ctx.bezierCurveTo(280, 60, 260, 270, 350, 270); // Drop
-            ctx.arc(425, 200, 70, Math.PI * 0.75, Math.PI * 2.25, false); // Looping
-            ctx.moveTo(495, 270);
-            ctx.bezierCurveTo(600, 270, 680, 280, 750, 280); // Remzone
+            for (let t = 0; t <= 1.0; t += 0.005) {
+                let pt = getTrackCoordinates(t);
+                if (t === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
             ctx.stroke();
             ctx.shadowBlur = 0;
 
+            // Teken wagentje exact op de coördinaat
             let pos = getTrackCoordinates(cartProgress);
-
-            // Teken achtbaanwagentje
             ctx.fillStyle = isPausedForHazard ? "#ff0055" : "#00ffcc";
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
@@ -477,69 +462,55 @@
         }
 
         function getTrackCoordinates(t) {
-            // Wiskundige coördinaten passend bij de getekende baansegmenten
             let x, y;
-            if (t < 0.25) { // Klim
+            if (t < 0.25) { // 1. Klim
                 let p = t / 0.25;
-                x = 50 + p * 170;
-                y = 280 - p * 220;
-            } else if (t < 0.5) { // Drop
+                x = 60 + p * 160;
+                y = 280 - p * 200;
+            } else if (t < 0.5) { // 2. Drop
                 let p = (t - 0.25) / 0.25;
-                x = 220 + p * 130;
-                y = 60 + p * 210;
-            } else if (t < 0.75) { // Looping
+                x = 220 + p * 140;
+                y = 80 + p * 200;
+            } else if (t < 0.75) { // 3. Looping (Vloeiende cirkelboog in het midden)
                 let p = (t - 0.5) / 0.25;
-                let angle = (Math.PI * 0.75) + p * (Math.PI * 1.5);
-                x = 425 + Math.cos(angle) * 70;
-                y = 200 + Math.sin(angle) * 70;
-            } else { // Remzone
+                let angle = (-Math.PI / 2) + p * (Math.PI * 2);
+                x = 450 + Math.cos(angle) * 55;
+                y = 220 + Math.sin(angle) * 55;
+            } else { // 4. Remzone (Vlak naar rechts en ronding terug naar start)
                 let p = (t - 0.75) / 0.25;
-                x = 495 + p * 255;
-                y = 270 + p * 10;
+                x = 505 + p * 235;
+                y = 275 - Math.sin(p * Math.PI) * 30;
             }
             return {x, y};
         }
 
         function triggerRandomHazard() {
-            if (!gameActive || isPausedForHazard) return;
-            
-            let available = sectors.map((s, idx) => s.status === 0 ? idx : -1).filter(idx => idx !== -1);
+            if (!gameActive) return;
+            // Kies een willekeurige sector die nog geen storing heeft
+            let available = sectors.map((s, idx) => !s.hasHazard ? idx : -1).filter(idx => idx !== -1);
             if (available.length > 0) {
                 let chosen = available[Math.floor(Math.random() * available.length)];
-                sectors[chosen].status = 1;
-                updateUI();
+                sectors[chosen].hasHazard = true;
             }
         }
 
         function tryOpenMiniGame(sectorIdx) {
-            if (!gameActive || sectors[sectorIdx].status === 0) return;
+            if (!gameActive || !sectors[sectorIdx].hasHazard || activeHazardSector !== sectorIdx) return;
             
-            // Controleer of de trein ook daadwerkelijk in deze sector is gestopt!
-            let s = sectors[sectorIdx];
-            if (!(cartProgress >= s.minT && cartProgress <= s.maxT)) {
-                alert("De trein is nog niet in deze sector! Wacht tot hij arriveert.");
-                return;
-            }
-
-            activeHazardSector = sectorIdx;
             playSound('click');
-
             const overlay = document.getElementById('minigame-overlay');
             const title = document.getElementById('mg-title');
             const instruction = document.getElementById('mg-instruction');
             const content = document.getElementById('mg-content');
 
             overlay.style.display = 'flex';
-            title.innerText = `Storing in: ${sectors.name}`;
+            title.innerText = `Storing in: ${sectors[sectorIdx].name}`;
             content.innerHTML = '';
 
-            // Gevarieerde mini-games per sector (zodat het niet steeds hetzelfde is)
             if (sectorIdx === 0) {
-                // Klim: Sleep/Klik hijskabel connectie (Willekeurige knopreeks)
                 instruction.innerText = "Klik in de juiste volgorde op de hijskabels (1, 2, 3)!";
                 let sequence = [1, 2, 3].sort(() => Math.random() - 0.5);
                 let currentStep = 0;
-                
                 sequence.forEach(num => {
                     let btn = document.createElement('button');
                     btn.className = 'btn';
@@ -559,46 +530,31 @@
                     };
                     content.appendChild(btn);
                 });
-
             } else if (sectorIdx === 1) {
-                // Drop: Snelheidsschuif exact afstellen
                 instruction.innerText = "Zet de remdemper precies op 50%!";
                 let slider = document.createElement('input');
                 slider.type = 'range';
                 slider.min = '0';
                 slider.max = '100';
                 slider.value = Math.floor(Math.random() * 80) + 10;
-                
                 let valLbl = document.createElement('p');
                 valLbl.innerText = `Huidige waarde: ${slider.value}%`;
                 valLbl.style.color = '#00ffcc';
-                
                 slider.oninput = () => { valLbl.innerText = `Huidige waarde: ${slider.value}%`; };
-
                 let checkBtn = document.createElement('button');
                 checkBtn.className = 'btn';
                 checkBtn.innerText = 'Bevestig Stand';
                 checkBtn.onclick = () => {
-                    let val = parseInt(slider.value);
-                    if (val >= 45 && val <= 55) {
-                        resolveMiniGame();
-                    } else {
-                        stability -= 5;
-                        playSound('alarm');
-                        updateUI();
-                        alert("Niet nauwkeurig genoeg! Richt op 50%.");
-                    }
+                    if (parseInt(slider.value) >= 45 && parseInt(slider.value) <= 55) resolveMiniGame();
+                    else { stability -= 5; playSound('alarm'); updateUI(); alert("Richt op 50%!"); }
                 };
                 content.appendChild(slider);
                 content.appendChild(valLbl);
                 content.appendChild(checkBtn);
-
             } else if (sectorIdx === 2) {
-                // Looping: G-Kracht ontluchten (Snel 4 verschillende kleppen indrukken)
                 instruction.innerText = "Druk de 3 ontluchtingsventielen in!";
                 let options = ['Hydro-Ventiel', 'Stoom-Release', 'Lucht-Klep'].sort(() => Math.random() - 0.5);
                 let clickedCount = 0;
-
                 options.forEach(name => {
                     let btn = document.createElement('button');
                     btn.className = 'btn';
@@ -615,9 +571,7 @@
                     };
                     content.appendChild(btn);
                 });
-
             } else if (sectorIdx === 3) {
-                // Remzone: Remblokken losmaken door dubbel/snel te klikken in juiste vlak
                 instruction.innerText = "Klik 5 keer snel op de noodrem-knop!";
                 let clicksLeft = 5;
                 let btn = document.createElement('button');
@@ -626,11 +580,8 @@
                 btn.onclick = () => {
                     clicksLeft--;
                     playSound('click');
-                    if (clicksLeft > 0) {
-                        btn.innerText = `Noodrem (${clicksLeft}x)`;
-                    } else {
-                        resolveMiniGame();
-                    }
+                    if (clicksLeft > 0) btn.innerText = `Noodrem (${clicksLeft}x)`;
+                    else resolveMiniGame();
                 };
                 content.appendChild(btn);
             }
@@ -638,9 +589,9 @@
 
         function resolveMiniGame() {
             playSound('success');
-            sectors[activeHazardSector].status = 0;
+            sectors[activeHazardSector].hasHazard = false;
             activeHazardSector = null;
-            isPausedForHazard = false; // Wagentje rijdt weer verder!
+            isPausedForHazard = false;
             score += 150;
             document.getElementById('minigame-overlay').style.display = 'none';
             updateUI();
@@ -649,14 +600,11 @@
         function closeMiniGame(success) {
             document.getElementById('minigame-overlay').style.display = 'none';
             if (!success && activeHazardSector !== null) {
-                sectors[activeHazardSector].status = 0;
+                sectors[activeHazardSector].hasHazard = false;
                 activeHazardSector = null;
-                isPausedForHazard = false; // Wagentje rijdt door ondanks straf
+                isPausedForHazard = false;
                 stability -= 15;
-                if (stability <= 0) {
-                    stability = 0;
-                    endGame(false);
-                }
+                if (stability <= 0) { stability = 0; endGame(false); }
                 updateUI();
             }
         }
@@ -674,10 +622,10 @@
             endScreen.style.display = 'flex';
             if (won) {
                 endTitle.innerText = "Missie Geslaagd!";
-                endMessage.innerText = `Geweldig werk! Je hebt het park gered met een eindscore van ${score} punten en ${stability}% stabiliteit.`;
+                endMessage.innerText = `Geweldig werk! Score: ${score}, Stabiliteit: ${stability}%.`;
             } else {
                 endTitle.innerText = "CRASH! - Park Ontruimd";
-                endMessage.innerText = `De stabiliteit bereikte 0%. De achtbaan is ontspoord! Score: ${score}.`;
+                endMessage.innerText = `De stabiliteit bereikte 0%. Score: ${score}.`;
             }
         }
     </script>
