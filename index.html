@@ -308,7 +308,6 @@
         const baseSpeed = 0.0012;
         let isPausedForHazard = false;
 
-        // 4 Sectoren met exacte t-grenzen
         let sectors = [
             { name: "De Klim", minT: 0.0, maxT: 0.25, hasHazard: false },
             { name: "De Drop", minT: 0.25, maxT: 0.50, hasHazard: false },
@@ -415,20 +414,18 @@
                 cartProgress += baseSpeed;
                 if (cartProgress > 1.0) {
                     cartProgress = 0.0;
-                    hazardCheckedForThisLap = [false, false, false, false]; // Reset voor nieuwe ronde
+                    hazardCheckedForThisLap = [false, false, false, false];
                 }
 
-                // Bepaal in welke sector de trein nu is (0, 1, 2 of 3)
                 let currentSectorIdx = Math.floor(cartProgress * 4);
                 if (currentSectorIdx > 3) currentSectorIdx = 3;
 
-                // Als we een nieuwe sector binnenkomen, kans van 50% op een storing
                 if (!hazardCheckedForThisLap[currentSectorIdx]) {
                     hazardCheckedForThisLap[currentSectorIdx] = true;
-                    if (Math.random() < 0.6) { // 60% kans op storing per sector
+                    if (Math.random() < 0.6) {
                         sectors[currentSectorIdx].hasHazard = true;
                         activeHazardSector = currentSectorIdx;
-                        isPausedForHazard = true; // Wagentje stopt exact bij binnenkomst!
+                        isPausedForHazard = true;
                         playSound('alarm');
                         document.getElementById('game-box').classList.add('shake');
                         setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
@@ -443,7 +440,6 @@
         function drawTrackAndCart() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Strakke, doorlopende baan zonder overbodige dubbele lijnen
             ctx.beginPath();
             ctx.strokeStyle = "#4a1c7a";
             ctx.lineWidth = 6;
@@ -458,7 +454,6 @@
             ctx.stroke();
             ctx.shadowBlur = 0;
 
-            // Teken wagentje exact op de coördinaat
             let pos = getTrackCoordinates(cartProgress);
             ctx.fillStyle = isPausedForHazard ? "#ff0055" : "#00ffcc";
             ctx.beginPath();
@@ -471,23 +466,23 @@
 
         function getTrackCoordinates(t) {
             let x, y;
-            if (t < 0.25) { // 1. De Klim (Recht omhoog)
+            if (t < 0.25) { // 1. De Klim (Recht omhoog van links naar top)
                 let p = t / 0.25;
-                x = 80 + p * 150;
-                y = 270 - p * 200;
-            } else if (t < 0.50) { // 2. De Drop (Naar beneden)
+                x = 100 + p * 150;
+                y = 270 - p * 190;
+            } else if (t < 0.50) { // 2. De Drop (Van top naar beneden)
                 let p = (t - 0.25) / 0.25;
-                x = 230 + p * 150;
-                y = 70 + p * 200;
-            } else if (t < 0.75) { // 3. De Looping (Eén nette cirkel in het midden zonder kruisende rommel)
+                x = 250 + p * 130;
+                y = 80 + p * 190;
+            } else if (t < 0.75) { // 3. De Looping (Volledige vloeiende cirkel, geen rechte rommel erdoorheen)
                 let p = (t - 0.50) / 0.25;
-                let angle = (-Math.PI / 2) + p * (Math.PI * 2);
-                x = 500 + Math.cos(angle) * 60;
-                y = 210 + Math.sin(angle) * 60;
-            } else { // 4. De Remzone (Vlak naar rechts en rustig terug naar start)
+                let angle = p * (Math.PI * 2) - Math.PI / 2;
+                x = 480 + Math.cos(angle) * 55;
+                y = 225 + Math.sin(angle) * 55;
+            } else { // 4. De Remzone (Vlak naar rechts en rustig naar start)
                 let p = (t - 0.75) / 0.25;
-                x = 560 + p * 160;
-                y = 270;
+                x = 535 + p * 165;
+                y = 280;
             }
             return {x, y};
         }
