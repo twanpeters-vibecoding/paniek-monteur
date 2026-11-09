@@ -262,7 +262,7 @@
                 <div class="sector-status" id="status-1">Normaal</div>
             </div>
             <div class="sector-card" id="sector-2" onclick="tryOpenMiniGame(2)">
-                <div class="sector-title">3. De Looping</div>
+                <div class="sector-title">3. Kurkentrekker</div>
                 <div class="sector-status" id="status-2">Normaal</div>
             </div>
             <div class="sector-card" id="sector-3" onclick="tryOpenMiniGame(3)">
@@ -311,7 +311,7 @@
         let sectors = [
             { name: "De Klim", minT: 0.0, maxT: 0.25, hasHazard: false },
             { name: "De Drop", minT: 0.25, maxT: 0.50, hasHazard: false },
-            { name: "De Looping", minT: 0.50, maxT: 0.75, hasHazard: false },
+            { name: "Kurkentrekker", minT: 0.50, maxT: 0.75, hasHazard: false },
             { name: "De Remzone", minT: 0.75, maxT: 1.00, hasHazard: false }
         ];
 
@@ -418,7 +418,7 @@
                 }
 
                 let currentSectorIdx = Math.floor(cartProgress * 4);
-                if (currentSectorIdx > 3) currentSectorIdx = 3;
+                if (currentSectorIdx > 3) currentSectorIdx= 3;
 
                 if (!hazardCheckedForThisLap[currentSectorIdx]) {
                     hazardCheckedForThisLap[currentSectorIdx] = true;
@@ -464,25 +464,24 @@
             ctx.stroke();
         }
 
-        // Volledig zuivere en subtiele curve-formule zonder snijdende lijnen
+        // Perfect doorlopende baan met Klim, Drop, een strakke Kurkentrekker golf en Remzone
         function getTrackCoordinates(t) {
             let x, y;
-            if (t < 0.25) { // 1. De Klim (Start links-onder naar hoge piek)
+            if (t < 0.25) { // 1. De Klim
                 let p = t / 0.25;
                 x = 90 + p * 150;
                 y = 280 - p * 200;
-            } else if (t < 0.50) { // 2. De Drop (Subtiele vloeiende boog omlaag naar de looping-invoer)
+            } else if (t < 0.50) { // 2. De Drop
                 let p = (t - 0.25) / 0.25;
                 x = 240 + p * 140;
                 y = 80 + p * 180;
-            } else if (t < 0.75) { // 3. De Looping (Op zichzelf staande, strakke cirkel gecentreerd op 470, 210)
+            } else if (t < 0.75) { // 3. De Kurkentrekker (Vloeiende, schroefvormige kurkentrekker-golf zonder snijdende lijnen)
                 let p = (t - 0.50) / 0.25;
-                let angle = p * (Math.PI * 2) - Math.PI / 2;
-                x = 470 + Math.cos(angle) * 55;
-                y = 210 + Math.sin(angle) * 55;
-            } else { // 4. De Remzone (Vloeiende uitgang van looping naar rechts en terug naar start)
+                x = 380 + p * 160;
+                y = 260 + Math.sin(p * Math.PI * 3) * 40;
+            } else { // 4. De Remzone
                 let p = (t - 0.75) / 0.25;
-                x = 525 + p * 185;
+                x = 540 + p * 160;
                 y = 280;
             }
             return {x, y};
@@ -546,8 +545,9 @@
                 content.appendChild(valLbl);
                 content.appendChild(checkBtn);
             } else if (sectorIdx === 2) {
-                instruction.innerText = "Druk de 3 ontluchtingsventielen in!";
-                let options = ['Hydro-Ventiel', 'Stoom-Release', 'Lucht-Klep'].sort(() => Math.random() - 0.5);
+                // Aangepaste mini-game voor de Kurkentrekker (Schroefas / Spiraal ontluchten)
+                instruction.innerText = "Draai de 3 schroefas-ventielen open!";
+                let options = ['As-Klem', 'Kurk-Ventiel', 'Schroef-Lock'].sort(() => Math.random() - 0.5);
                 let clickedCount = 0;
                 options.forEach(name => {
                     let btn = document.createElement('button');
