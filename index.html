@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>De Paniek-Monteur - Pretpark Arcade</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0f051d;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            color: #ff0055;
+            font-size: 2rem;
+            text-shadow: 0 0 10px rgba(255, 0, 85, 0.6);
+            margin-bottom: 5px;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-item span {
+            color: #00ffcc;
+            font-weight: bold;
+        }
+
+        .game-container {
+            position: relative;
+            width: 800px;
+            max-width: 100%;
+            background: #1a0b2e;
+            border-radius: 15px;
+            border: 2px solid #33145a;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background: radial-gradient(circle at center, #240e40 0%, #0d041a 100%);
+            display: block;
+            width: 100%;
+            height: 350px;
+        }
+
+        .sectors-panel {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+            padding: 15px;
+            background: #120521;
+        }
+
+        .sector-card {
+            background: #230d3d;
+            border: 2px solid #4a1c7a;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .sector-card:hover {
+            border-color: #00ffcc;
+            transform: translateY(-2px);
+        }
+
+        .sector-card.danger {
+            border-color: #ff0055;
+            animation: pulse-danger 0.8s infinite alternate;
+        }
+
+        @keyframes pulse-danger {
+            from { background-color: #230d3d; box-shadow: 0 0 5px #ff0055; }
+            to { background-color: #4a0d23; box-shadow: 0 0 15px #ff0055; }
+        }
+
+        .sector-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #d1b3ff;
+        }
+
+        .sector-status {
+            font-size: 0.8rem;
+            color: #00ffcc;
+        }
+
+        .sector-card.danger .sector-status {
+            color: #ff4d4d;
+        }
+
+        /* Minigame Overlay */
+        .minigame-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 3, 20, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            display: none;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .minigame-overlay h2 {
+            color: #ff0055;
+            margin-bottom: 10px;
+        }
+
+        .minigame-content {
+            margin: 15px 0;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #4a1c7a;
+            min-width: 300px;
+        }
+
+        .btn {
+            background: #00ffcc;
+            color: #0b0214;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+            background: #00cc99;
+            transform: scale(1.05);
+        }
+
+        .btn-danger {
+            background: #ff0055;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #cc0044;
+        }
+
+        /* Start / Game Over Screens */
+        .screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 4, 26, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .screen-overlay h2 {
+            font-size: 2.5rem;
+            color: #00ffcc;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+        }
+
+        .screen-overlay p {
+            font-size: 1.1rem;
+            color: #d1b3ff;
+            margin-bottom: 20px;
+            max-width: 500px;
+        }
+
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>De Paniek-Monteur</h1>
+        <p>Houd het achtbaanwagentje heel en red het park!</p>
+    </header>
+
+    <div class="stats-container">
+        <div class="stat-item">Stabiliteit: <span id="stability-val">100</span>%</div>
+        <div class="stat-item">Score: <span id="score-val">0</span></div>
+        <div class="stat-item">Tijd over: <span id="time-val">60</span>s</div>
+    </div>
+
+    <div class="game-container" id="game-box">
+        <!-- Canvas Circuit -->
+        <canvas id="coasterCanvas" width="800" height="350"></canvas>
+
+        <!-- 4 Sectoren onderaan -->
+        <div class="sectors-panel">
+            <div class="sector-card" id="sector-0" onclick="openMiniGame(0)">
+                <div class="sector-title">1. De Klim</div>
+                <div class="sector-status" id="status-0">Optimaal</div>
+            </div>
+            <div class="sector-card" id="sector-1" onclick="openMiniGame(1)">
+                <div class="sector-title">2. De Drop</div>
+                <div class="sector-status" id="status-1">Optimaal</div>
+            </div>
+            <div class="sector-card" id="sector-2" onclick="openMiniGame(2)">
+                <div class="sector-title">3. De Looping</div>
+                <div class="sector-status" id="status-2">Optimaal</div>
+            </div>
+            <div class="sector-card" id="sector-3" onclick="openMiniGame(3)">
+                <div class="sector-title">4. De Remzone</div>
+                <div class="sector-status" id="status-3">Optimaal</div>
+            </div>
+        </div>
+
+        <!-- Minigame Popup Overlay -->
+        <div class="minigame-overlay" id="minigame-overlay">
+            <h2 id="mg-title">Storing!</h2>
+            <p id="mg-instruction">Los het snel op!</p>
+            <div class="minigame-content" id="mg-content">
+                <!-- Dynamische minigame inhoud -->
+            </div>
+            <button class="btn btn-danger" onclick="closeMiniGame(false)">Sluiten / Negeren</button>
+        </div>
+
+        <!-- Start Scherm -->
+        <div class="screen-overlay" id="start-screen">
+            <h2>Klaar voor de chaos?</h2>
+            <p>Er rijdt één achtbaanwagentje over je baan. Als er een sector rood knippert, klik er dan direct op om een mini-game te starten en een crash te voorkomen!</p>
+            <button class="btn" onclick="startGame()">Start Dienst</button>
+        </div>
+
+        <!-- Game Over / Win Scherm -->
+        <div class="screen-overlay" id="end-screen" style="display: none;">
+            <h2 id="end-title">Dienst Erop Zit!</h2>
+            <p id="end-message">Je hebt het park gered.</p>
+            <button class="btn" onclick="startGame()">Opnieuw Spelen</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('coasterCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameActive = false;
+        let stability = 100;
+        let score = 0;
+        let timeLeft = 60;
+        let gameTimer, cartInterval, hazardInterval;
+
+        // Wagentje positie op de baan (0.0 tot 1.0)
+        let cartProgress = 0.0;
+        const cartSpeed = 0.0018;
+
+        // Sectoren status: 0 = OK, 1 = Storing actief
+        let sectors = [
+            { name: "De Klim", status: 0, timer: 0 },
+            { name: "De Drop", status: 0, timer: 0 },
+            { name: "De Looping", status: 0, timer: 0 },
+            { name: "De Remzone", status: 0, timer: 0 }
+        ];
+
+        let activeMiniGameSector = null;
+
+        // Web Audio API
+        let audioCtx = null;
+        function playSound(type) {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                let now = audioCtx.currentTime;
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'success') {
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'alarm') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(150, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch(e) {}
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            stability = 100;
+            score = 0;
+            timeLeft = 60;
+            cartProgress = 0.0;
+            sectors.forEach(s => { s.status = 0; s.timer = 0; });
+            gameActive = true;
+
+            updateUI();
+
+            clearInterval(gameTimer);
+            clearInterval(cartInterval);
+            clearInterval(hazardInterval);
+
+            gameTimer = setInterval(() => {
+                if (!gameActive) return;
+                timeLeft--;
+                if (timeLeft <= 0) {
+                    endGame(true);
+                }
+                updateUI();
+            }, 1000);
+
+            cartInterval = setInterval(updateGameLoop, 30);
+            hazardInterval = setInterval(triggerRandomHazard, 4500);
+        }
+
+        function updateUI() {
+            document.getElementById('stability-val').innerText = stability;
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('time-val').innerText = timeLeft;
+
+            for (let i = 0; i < 4; i++) {
+                const card = document.getElementById(`sector-${i}`);
+                const statusTxt = document.getElementById(`status-${i}`);
+                if (sectors[i].status === 1) {
+                    card.classList.add('danger');
+                    statusTxt.innerText = "STORING!";
+                } else {
+                    card.classList.remove('danger');
+                    statusTxt.innerText = "Optimaal";
+                }
+            }
+        }
+
+        // --- Cirkel / Baan Tekenen op Canvas ---
+        function updateGameLoop() {
+            if (!gameActive) return;
+
+            // Beweeg karretje
+            cartProgress += cartSpeed;
+            if (cartProgress > 1.0) cartProgress = 0.0;
+
+            // Wis canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Teken achtbaanrails (mooie vloeiende lijn)
+            ctx.beginPath();
+            ctx.strokeStyle = "#4a1c7a";
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#7b2cbf";
+            
+            // Teken een baan met een klim, drop, looping en remmen
+            ctx.moveTo(50, 280);
+            ctx.bezierCurveTo(200, 50, 300, 50, 400, 180);
+            ctx.bezierCurveTo(500, 300, 600, 50, 750, 280);
+            ctx.stroke();
+            ctx.shadowBlur = 0; // reset
+
+            // Bereken positie karretje op basis van cartProgress
+            let pos = getBezierPosition(cartProgress);
+
+            // Teken karretje
+            ctx.fillStyle = "#ff0055";
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Passagier hoofdje
+            ctx.fillStyle = "#00ffcc";
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y - 4, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function getBezierPosition(t) {
+            // Eenvoudige benadering van de curve voor visualisatie
+            let p0 = {x: 50, y: 280};
+            let p1 = {x: 200, y: 50};
+            let p2 = {x: 300, y: 50};
+            let p3 = {x: 400, y: 180};
+            let p4 = {x: 500, y: 300};
+            let p5 = {x: 600, y: 50};
+            let p6 = {x: 750, y: 280};
+
+            let x, y;
+            if (t < 0.5) {
+                let lt = t * 2;
+                let u = 1 - lt;
+                x = u*u*u*p0.x + 3*u*u*lt*p1.x + 3*u*lt*lt*p2.x + lt*lt*lt*p3.x;
+                y = u*u*u*p0.y + 3*u*u*lt*p1.y + 3*u*lt*lt*p2.y + lt*lt*lt*p3.y;
+            } else {
+                let lt = (t - 0.5) * 2;
+                let u = 1 - lt;
+                x = u*u*u*p3.x + 3*u*u*lt*p4.x + 3*u*lt*lt*p5.x + lt*lt*lt*p6.x;
+                y = u*u*u*p3.y + 3*u*u*lt*p4.y + 3*u*lt*lt*p5.y + lt*lt*lt*p6.y;
+            }
+            return {x, y};
+        }
+
+        function triggerRandomHazard() {
+            if (!gameActive) return;
+            // Kies een willekeurige sector die nog geen storing heeft
+            let available = sectors.map((s, idx) => s.status === 0 ? idx : -1).filter(idx => idx !== -1);
+            if (available.length > 0) {
+                let chosen = available[Math.floor(Math.random() * available.length)];
+                sectors[chosen].status = 1;
+                playSound('alarm');
+                document.getElementById('game-box').classList.add('shake');
+                setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
+                updateUI();
+            }
+        }
+
+        // --- Uitgebreide Mini-games per Sector ---
+        function openMiniGame(sectorIdx) {
+            if (!gameActive || sectors[sectorIdx].status === 0) return;
+            activeMiniGameSector = sectorIdx;
+            playSound('click');
+
+            const overlay = document.getElementById('minigame-overlay');
+            const title = document.getElementById('mg-title');
+            const instruction = document.getElementById('mg-instruction');
+            const content = document.getElementById('mg-content');
+
+            overlay.style.display = 'flex';
+            title.innerText = `Storing in: ${sectors[sectorIdx].name}`;
+
+            content.innerHTML = '';
+
+            if (sectorIdx === 0) {
+                // Minigame 1: Bouten aandraaien (3x klikken)
+                instruction.innerText = "Draai de losse bouten snel aan!";
+                let clicksNeeded = 3;
+                let btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.innerText = `Vastdraaien (${clicksNeeded} te gaan)`;
+                btn.onclick = () => {
+                    clicksNeeded--;
+                    playSound('click');
+                    if (clicksNeeded > 0) {
+                        btn.innerText = `Vastdraaien (${clicksNeeded} te gaan)`;
+                    } else {
+                        resolveMiniGame();
+                    }
+                };
+                content.appendChild(btn);
+
+            } else if (sectorIdx === 1) {
+                // Minigame 2: Koelwater spuiten (Snel knoppen kiezen)
+                instruction.innerText = "Klik op de juiste klep om wielen te koelen!";
+                let targetValve = Math.floor(Math.random() * 3) + 1;
+                for (let i = 1; i <= 3; i++) {
+                    let vBtn = document.createElement('button');
+                    vBtn.className = 'btn';
+                    vBtn.innerText = `Klep #${i}`;
+                    vBtn.onclick = () => {
+                        if (i === targetValve) {
+                            resolveMiniGame();
+                        } else {
+                            stability -= 5;
+                            updateUI();
+                            playSound('alarm');
+                            alert("Foute klep! Stabiliteit daalt.");
+                        }
+                    };
+                    content.appendChild(vBtn);
+                }
+
+            } else if (sectorIdx === 2) {
+                // Minigame 3: Stroomkabel verbinden (Spam click)
+                instruction.innerText = "Duw de hoofdschakelaar omhoog!";
+                let progress = 0;
+                let sBtn = document.createElement('button');
+                sBtn.className = 'btn';
+                sBtn.innerText = `Duwen! (0%)`;
+                sBtn.onclick = () => {
+                    progress += 25;
+                    playSound('click');
+                    if (progress >= 100) {
+                        resolveMiniGame();
+                    } else {
+                        sBtn.innerText = `Duwen! (${progress}%)`;
+                    }
+                };
+                content.appendChild(sBtn);
+
+            } else if (sectorIdx === 3) {
+                // Minigame 4: Remhendel justeren
+                instruction.innerText = "Zet de remhendel op 'Niveau 2'!";
+                for (let lvl = 1; lvl <= 3; lvl++) {
+                    let rBtn = document.createElement('button');
+                    rBtn.className = 'btn';
+                    rBtn.innerText = `Remniveau ${lvl}`;
+                    rBtn.onclick = () => {
+                        if (lvl === 2) {
+                            resolveMiniGame();
+                        } else {
+                            stability -= 5;
+                            updateUI();
+                            playSound('alarm');
+                            alert("Verkeerd niveau!");
+                        }
+                    };
+                    content.appendChild(rBtn);
+                }
+            }
+        }
+
+        function resolveMiniGame() {
+            playSound('success');
+            sectors[activeMiniGameSector].status = 0;
+            score += 100;
+            document.getElementById('minigame-overlay').style.display = 'none';
+            updateUI();
+        }
+
+        function closeMiniGame(success) {
+            document.getElementById('minigame-overlay').style.display = 'none';
+            if (!success && activeMiniGameSector !== null) {
+                sectors[activeMiniGameSector].status = 0;
+                stability -= 15;
+                if (stability <= 0) {
+                    stability = 0;
+                    endGame(false);
+                }
+                updateUI();
+            }
+        }
+
+        function endGame(won) {
+            gameActive = false;
+            clearInterval(gameTimer);
+            clearInterval(cartInterval);
+            clearInterval(hazardInterval);
+
+            const endScreen = document.getElementById('end-screen');
+            const endTitle = document.getElementById('end-title');
+            const endMessage = document.getElementById('end-message');
+
+            endScreen.style.display = 'flex';
+            if (won) {
+                endTitle.innerText = "Missie Geslaagd!";
+                endMessage.innerText = `Geweldig werk! Je hebt het park gered met een eindscore van ${score} punten en ${stability}% stabiliteit.`;
+            } else {
+                endTitle.innerText = "CRASH! - Park Ontruimd";
+                endMessage.innerText = `De stabiliteit bereikte 0%. De achtbaan is ontspoord! Score: ${score}.`;
+            }
+        }
+    </script>
+</body>
+</html>
