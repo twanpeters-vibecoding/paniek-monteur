@@ -464,24 +464,25 @@
             ctx.stroke();
         }
 
+        // Subtiele, naadloze baanformule op basis van 4 gelijke kwadranten
         function getTrackCoordinates(t) {
             let x, y;
-            if (t < 0.25) { // 1. De Klim (Recht omhoog van links naar top)
+            if (t < 0.25) { // 1. De Klim (Linker onderkant naar piek)
                 let p = t / 0.25;
                 x = 100 + p * 150;
-                y = 270 - p * 190;
-            } else if (t < 0.50) { // 2. De Drop (Van top naar beneden)
+                y = 280 - p * 200;
+            } else if (t < 0.50) { // 2. De Drop (Vloeiend omlaag richting het begin van de looping)
                 let p = (t - 0.25) / 0.25;
-                x = 250 + p * 130;
-                y = 80 + p * 190;
-            } else if (t < 0.75) { // 3. De Looping (Volledige vloeiende cirkel, geen rechte rommel erdoorheen)
+                x = 250 + p * 150;
+                y = 80 + p * 170;
+            } else if (t < 0.75) { // 3. De Looping (Prachtige, op zichzelf staande cirkel zonder snijdende lijnen)
                 let p = (t - 0.50) / 0.25;
                 let angle = p * (Math.PI * 2) - Math.PI / 2;
-                x = 480 + Math.cos(angle) * 55;
-                y = 225 + Math.sin(angle) * 55;
-            } else { // 4. De Remzone (Vlak naar rechts en rustig naar start)
+                x = 500 + Math.cos(angle) * 55;
+                y = 205 + Math.sin(angle) * 55;
+            } else { // 4. De Remzone (Vloeiend uit de looping naar rechts en terug naar start)
                 let p = (t - 0.75) / 0.25;
-                x = 535 + p * 165;
+                x = 555 + p * 145;
                 y = 280;
             }
             return {x, y};
