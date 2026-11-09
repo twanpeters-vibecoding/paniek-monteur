@@ -240,7 +240,7 @@
 
     <header>
         <h1>De Paniek-Monteur</h1>
-        <p>Los storingen direct op wanneer het wagentje arriveert!</p>
+        <p>Los storingen direct op wanneer de wagen arriveert!</p>
     </header>
 
     <div class="stats-container">
@@ -282,7 +282,7 @@
         <!-- Start Scherm -->
         <div class="screen-overlay" id="start-screen">
             <h2>Klaar voor de chaos?</h2>
-            <p>Het wagentje volgt de doorlopende baan. Bij een storing stopt het wagentje automatisch wanneer het in de sector arriveert. Klik op de sector om te repareren!</p>
+            <p>Zodra het wagentje een sector binnenrijdt, kan er willekeurig een storing ontstaan. Het wagentje stopt dan en jij moet direct actie ondernemen!</p>
             <button class="btn" onclick="startGame()">Start Dienst</button>
         </div>
 
@@ -302,21 +302,22 @@
         let stability = 100;
         let score = 0;
         let timeLeft = 60;
-        let gameTimer, cartInterval, hazardInterval;
+        let gameTimer, cartInterval;
 
         let cartProgress = 0.0;
-        const baseSpeed = 0.0015;
+        const baseSpeed = 0.0012;
         let isPausedForHazard = false;
 
-        // Sectoren met nauwkeurige baan-intervallen
+        // 4 Sectoren met exacte t-grenzen
         let sectors = [
             { name: "De Klim", minT: 0.0, maxT: 0.25, hasHazard: false },
-            { name: "De Drop", minT: 0.25, maxT: 0.5, hasHazard: false },
-            { name: "De Looping", minT: 0.5, maxT: 0.75, hasHazard: false },
-            { name: "De Remzone", minT: 0.75, maxT: 1.0, hasHazard: false }
+            { name: "De Drop", minT: 0.25, maxT: 0.50, hasHazard: false },
+            { name: "De Looping", minT: 0.50, maxT: 0.75, hasHazard: false },
+            { name: "De Remzone", minT: 0.75, maxT: 1.00, hasHazard: false }
         ];
 
         let activeHazardSector = null;
+        let hazardCheckedForThisLap = [false, false, false, false];
 
         let audioCtx = null;
         function playSound(type) {
@@ -363,6 +364,7 @@
             cartProgress = 0.0;
             isPausedForHazard = false;
             sectors.forEach(s => s.hasHazard = false);
+            hazardCheckedForThisLap = [false, false, false, false];
             activeHazardSector = null;
             gameActive = true;
 
@@ -370,7 +372,6 @@
 
             clearInterval(gameTimer);
             clearInterval(cartInterval);
-            clearInterval(hazardInterval);
 
             gameTimer = setInterval(() => {
                 if (!gameActive) return;
@@ -380,7 +381,6 @@
             }, 1000);
 
             cartInterval = setInterval(updateGameLoop, 30);
-            hazardInterval = setInterval(triggerRandomHazard, 6000);
         }
 
         function updateUI() {
@@ -413,14 +413,22 @@
 
             if (!isPausedForHazard) {
                 cartProgress += baseSpeed;
-                if (cartProgress > 1.0) cartProgress = 0.0;
+                if (cartProgress > 1.0) {
+                    cartProgress = 0.0;
+                    hazardCheckedForThisLap = [false, false, false, false]; // Reset voor nieuwe ronde
+                }
 
-                // Controleer of de trein in een sector arriveert die een storing heeft klaarstaan
-                for (let i = 0; i < 4; i++) {
-                    let s = sectors[i];
-                    if (s.hasHazard && cartProgress >= s.minT && cartProgress < s.maxT && activeHazardSector === null) {
-                        isPausedForHazard = true;
-                        activeHazardSector = i;
+                // Bepaal in welke sector de trein nu is (0, 1, 2 of 3)
+                let currentSectorIdx = Math.floor(cartProgress * 4);
+                if (currentSectorIdx > 3) currentSectorIdx = 3;
+
+                // Als we een nieuwe sector binnenkomen, kans van 50% op een storing
+                if (!hazardCheckedForThisLap[currentSectorIdx]) {
+                    hazardCheckedForThisLap[currentSectorIdx] = true;
+                    if (Math.random() < 0.6) { // 60% kans op storing per sector
+                        sectors[currentSectorIdx].hasHazard = true;
+                        activeHazardSector = currentSectorIdx;
+                        isPausedForHazard = true; // Wagentje stopt exact bij binnenkomst!
                         playSound('alarm');
                         document.getElementById('game-box').classList.add('shake');
                         setTimeout(() => document.getElementById('game-box').classList.remove('shake'), 400);
@@ -435,14 +443,14 @@
         function drawTrackAndCart() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1 Doorlopende, naadloze achtbaanlijn berekenen en tekenen
+            // Strakke, doorlopende baan zonder overbodige dubbele lijnen
             ctx.beginPath();
             ctx.strokeStyle = "#4a1c7a";
             ctx.lineWidth = 6;
             ctx.shadowBlur = 10;
             ctx.shadowColor = "#7b2cbf";
 
-            for (let t = 0; t <= 1.0; t += 0.005) {
+            for (let t = 0; t <= 1.0; t += 0.002) {
                 let pt = getTrackCoordinates(t);
                 if (t === 0) ctx.moveTo(pt.x, pt.y);
                 else ctx.lineTo(pt.x, pt.y);
@@ -463,35 +471,25 @@
 
         function getTrackCoordinates(t) {
             let x, y;
-            if (t < 0.25) { // 1. Klim
+            if (t < 0.25) { // 1. De Klim (Recht omhoog)
                 let p = t / 0.25;
-                x = 60 + p * 160;
-                y = 280 - p * 200;
-            } else if (t < 0.5) { // 2. Drop
+                x = 80 + p * 150;
+                y = 270 - p * 200;
+            } else if (t < 0.50) { // 2. De Drop (Naar beneden)
                 let p = (t - 0.25) / 0.25;
-                x = 220 + p * 140;
-                y = 80 + p * 200;
-            } else if (t < 0.75) { // 3. Looping (Vloeiende cirkelboog in het midden)
-                let p = (t - 0.5) / 0.25;
+                x = 230 + p * 150;
+                y = 70 + p * 200;
+            } else if (t < 0.75) { // 3. De Looping (Eén nette cirkel in het midden zonder kruisende rommel)
+                let p = (t - 0.50) / 0.25;
                 let angle = (-Math.PI / 2) + p * (Math.PI * 2);
-                x = 450 + Math.cos(angle) * 55;
-                y = 220 + Math.sin(angle) * 55;
-            } else { // 4. Remzone (Vlak naar rechts en ronding terug naar start)
+                x = 500 + Math.cos(angle) * 60;
+                y = 210 + Math.sin(angle) * 60;
+            } else { // 4. De Remzone (Vlak naar rechts en rustig terug naar start)
                 let p = (t - 0.75) / 0.25;
-                x = 505 + p * 235;
-                y = 275 - Math.sin(p * Math.PI) * 30;
+                x = 560 + p * 160;
+                y = 270;
             }
             return {x, y};
-        }
-
-        function triggerRandomHazard() {
-            if (!gameActive) return;
-            // Kies een willekeurige sector die nog geen storing heeft
-            let available = sectors.map((s, idx) => !s.hasHazard ? idx : -1).filter(idx => idx !== -1);
-            if (available.length > 0) {
-                let chosen = available[Math.floor(Math.random() * available.length)];
-                sectors[chosen].hasHazard = true;
-            }
         }
 
         function tryOpenMiniGame(sectorIdx) {
@@ -613,7 +611,6 @@
             gameActive = false;
             clearInterval(gameTimer);
             clearInterval(cartInterval);
-            clearInterval(hazardInterval);
 
             const endScreen = document.getElementById('end-screen');
             const endTitle = document.getElementById('end-title');
